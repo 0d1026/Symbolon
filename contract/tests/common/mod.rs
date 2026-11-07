@@ -7,11 +7,16 @@ use serde::Deserialize;
 use serde_json::json;
 use symbolon::verifier::{Collateral, QuoteBytes};
 
+pub mod pay;
+
 pub const VERIFIER_WASM: &str = "tests/fixtures/tee_verifier_mainnet.wasm";
 pub const FIXTURE: &str = "tests/fixtures/attestation_2026-11-07.json";
 pub const TEST_WASM: &str = "../target/near/test/symbolon.wasm";
 /// Production build: no `test-nonce` feature, exactly what gets deployed.
 pub const PROD_WASM: &str = "../target/near/symbolon.wasm";
+pub const USDC_WASM: &str = "../target/near/usdc/mock_usdc.wasm";
+/// 1,000,000 USDC in base units (6 decimals), minted to the owner.
+pub const USDC_SUPPLY: u128 = 1_000_000_000_000;
 pub const MODEL: &str = "z-ai/glm-5.3-flash";
 pub const GATEWAY: &str = "nearai-gateway";
 
@@ -81,6 +86,7 @@ pub fn profile_json(m: &Measurements) -> serde_json::Value {
 
 pub struct Env {
     pub verifier: Account,
+    pub usdc: Contract,
     pub _worker: Worker<near_workspaces::network::Sandbox>,
     pub owner: Account,
     pub relayer: Account,
@@ -124,6 +130,23 @@ pub async fn setup_with(verifier_wasm: &[u8], wallet_wasm_path: &str) -> anyhow:
         .await?
         .into_result()?;
 
+    let usdc_wasm = std::fs::read(USDC_WASM)
+        .map_err(|e| anyhow::anyhow!("{USDC_WASM}: {e}. Run ./scripts/build.sh first"))?;
+    let usdc = root
+        .create_subaccount("usdc")
+        .initial_balance(NearToken::from_near(20))
+        .transact()
+        .await?
+        .into_result()?
+        .deploy(&usdc_wasm)
+        .await?
+        .into_result()?;
+    usdc.call("new")
+        .args_json(json!({"owner_id": owner.id(), "total_supply": USDC_SUPPLY.to_string()}))
+        .transact()
+        .await?
+        .into_result()?;
+
     let wasm = std::fs::read(wallet_wasm_path)
         .map_err(|e| anyhow::anyhow!("{wallet_wasm_path}: {e}. Run ./scripts/build.sh first"))?;
     let wallet = worker.dev_deploy(&wasm).await?;
@@ -133,6 +156,7 @@ pub async fn setup_with(verifier_wasm: &[u8], wallet_wasm_path: &str) -> anyhow:
             "owner": owner.id(),
             "verifier": verifier.id(),
             "key_ttl_ms": 7u64 * 24 * 3600 * 1000,
+            "usdc": usdc.id(),
         }))
         .transact()
         .await?
@@ -151,6 +175,7 @@ pub async fn setup_with(verifier_wasm: &[u8], wallet_wasm_path: &str) -> anyhow:
     }
     Ok(Env {
         verifier,
+        usdc,
         _worker: worker,
         owner,
         relayer,
@@ -235,7 +260,8 @@ pub async fn owner_call(e: &Env, method: &str, args: serde_json::Value) -> anyho
         .args_json(args)
         .transact()
         .await?
-        .into_result()?;
+        .into_result()
+        .map_err(|err| anyhow::anyhow!("owner call {method} failed: {err:?}"))?;
     Ok(())
 }
 

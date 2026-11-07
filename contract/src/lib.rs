@@ -11,12 +11,15 @@
 //! "Quote, Nonce, and Signer Bindings" reference
 //! (docs.near.ai/cloud/verification/reference/quote-nonce-signer.md).
 
-use near_sdk::store::IterableMap;
+use near_sdk::store::{IterableMap, LookupSet};
 use near_sdk::{
     env, near, require, AccountId, BorshStorageKey, Gas, NearToken, PanicOnDefault, Promise,
+    PublicKey,
 };
 
+pub mod pay;
 pub mod verifier;
+use pay::{Caps, HeldPayment, Merchant, PayNonce, PolicyTemplate, SpendWindow};
 use verifier::{Collateral, QuoteBytes, VerificationResult};
 
 /// Gas for NEAR One's `verify_quote`: 175.81 Tgas burnt measured on mainnet.
@@ -43,6 +46,10 @@ enum StorageKey {
     Profiles,
     Keys,
     Nonces,
+    Merchants,
+    PayNonces,
+    Settled,
+    Held,
 }
 
 /// Measurements the owner accepts for one kind of enclave, for example the
@@ -102,12 +109,23 @@ pub struct Symbolon {
     nonce_counter: u64,
     #[cfg(feature = "test-nonce")]
     test_next_nonce: Option<String>,
+    usdc: AccountId,
+    agent_pk: Option<PublicKey>,
+    template: Option<PolicyTemplate>,
+    merchants: IterableMap<AccountId, Merchant>,
+    caps: Caps,
+    window: SpendWindow,
+    pay_nonces: IterableMap<String, PayNonce>,
+    settled: LookupSet<String>,
+    held: IterableMap<u64, HeldPayment>,
+    next_held_id: u64,
+    frozen: bool,
 }
 
 #[near]
 impl Symbolon {
     #[init]
-    pub fn new(owner: AccountId, verifier: AccountId, key_ttl_ms: u64) -> Self {
+    pub fn new(owner: AccountId, verifier: AccountId, key_ttl_ms: u64, usdc: AccountId) -> Self {
         require!(key_ttl_ms > 0, "key_ttl_ms must be positive");
         Self {
             owner,
@@ -121,6 +139,17 @@ impl Symbolon {
             nonce_counter: 0,
             #[cfg(feature = "test-nonce")]
             test_next_nonce: None,
+            usdc,
+            agent_pk: None,
+            template: None,
+            merchants: IterableMap::new(StorageKey::Merchants),
+            caps: Caps::default(),
+            window: SpendWindow::default(),
+            pay_nonces: IterableMap::new(StorageKey::PayNonces),
+            settled: LookupSet::new(StorageKey::Settled),
+            held: IterableMap::new(StorageKey::Held),
+            next_held_id: 0,
+            frozen: false,
         }
     }
 
@@ -367,7 +396,7 @@ impl Symbolon {
 }
 
 impl Symbolon {
-    fn assert_owner(&self) {
+    pub(crate) fn assert_owner(&self) {
         require!(env::predecessor_account_id() == self.owner, "owner only");
     }
 
@@ -406,7 +435,7 @@ impl Symbolon {
         expired.len() as u32
     }
 
-    fn next_nonce(&mut self) -> String {
+    pub(crate) fn next_nonce(&mut self) -> String {
         #[cfg(feature = "test-nonce")]
         if let Some(n) = self.test_next_nonce.take() {
             return n;
@@ -572,7 +601,7 @@ fn lower_all(v: Vec<String>, bytes: usize) -> Vec<String> {
 }
 
 /// NEP-297 event with one data object of string fields, all JSON-escaped.
-fn emit(event: &str, fields: &[(&str, &str)]) {
+pub(crate) fn emit(event: &str, fields: &[(&str, &str)]) {
     let data = fields
         .iter()
         .map(|(k, v)| format!("{}:{}", json_str(k), json_str(v)))

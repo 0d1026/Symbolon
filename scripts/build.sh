@@ -10,3 +10,6 @@ ls -l ../target/near/symbolon.wasm ../target/near/test/symbolon.wasm
 # Sandbox-only fake verifier used by tests/mock_verifier.rs
 (cd ../mock-verifier && cargo near build non-reproducible-wasm --locked --no-abi --out-dir ../target/near/mock)
 ls -l ../target/near/mock/mock_verifier.wasm
+# Sandbox and testnet stand-in for USDC
+(cd ../mock-usdc && cargo near build non-reproducible-wasm --locked --no-abi --out-dir ../target/near/usdc)
+ls -l ../target/near/usdc/mock_usdc.wasm
