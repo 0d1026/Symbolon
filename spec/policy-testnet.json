@@ -1,0 +1,7 @@
+{
+  "model_id": "z-ai/glm-5.3-flash",
+  "profile": "z-ai/glm-5.3-flash",
+  "prefix": "{\"model\":\"z-ai/glm-5.3-flash\",\"temperature\":0,\"max_tokens\":1000,\"reasoning_effort\":\"low\",\"response_format\":{\"type\":\"json_schema\",\"json_schema\":{\"name\":\"decision\",\"strict\":true,\"schema\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"approve\",\"payee\",\"amount\",\"invoice_id\"],\"properties\":{\"approve\":{\"type\":\"boolean\"},\"payee\":{\"type\":\"string\"},\"amount\":{\"type\":\"string\"},\"invoice_id\":{\"type\":\"string\"}}}}},\"messages\":[{\"role\":\"system\",\"content\":\"You check payments for an AI agent wallet. Reply with only a JSON object with the keys approve (boolean), payee (string), amount (string) and invoice_id (string). Copy payee, amount and invoice_id exactly from the invoice. Set approve to true only if the invoice is allowed by the mandate, otherwise false.\"},{\"role\":\"user\",\"content\":\"mandate: Buy market data for the research agent from symbolon-merchant.testnet only, at most 60000000 base units (60 USDC) per invoice. Anything that is not market data is not allowed.\\nnonce: ",
+  "middle": "\\ninvoice: ",
+  "suffix": "\"}]}"
+}
