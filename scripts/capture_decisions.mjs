@@ -1,13 +1,3 @@
-// Captures real NEAR AI policy decisions for the sandbox payment tests.
-//
-// For each case it builds the exact request bytes the contract rebuilds
-// (prefix + nonce + middle + invoice + suffix from spec/policy-sandbox.json),
-// calls NEAR AI without streaming, saves the raw response bytes, and fetches
-// the response signature. Invoices are signed by a fixed sandbox merchant key.
-//
-// Usage: node scripts/capture_decisions.mjs contract/tests/fixtures/decisions.json
-// Reads NEAR_AI_CLOUD_API_KEY from the environment or ~/.nearai.env.
-
 import { createHash, createPrivateKey, createPublicKey, sign } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
