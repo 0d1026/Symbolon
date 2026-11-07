@@ -1,0 +1,37 @@
+[package]
+name = "symbolon"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "NEAR agent wallet that only trusts model signing keys proven on-chain to live in an attested Intel TDX enclave"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# Test-only: lets the owner fix the next attestation nonce so sandbox tests can
+# replay a captured NEAR AI report. Never enabled in the deployed build.
+test-nonce = []
+
+[dependencies]
+near-sdk = { version = "=5.30.1", features = ["unstable"] }
+borsh = { version = "1", features = ["derive"] }
+hex = { version = "0.4", default-features = false, features = ["alloc"] }
+
+[dev-dependencies]
+near-workspaces = { version = "=0.24.0", features = ["unstable"] }
+tokio = { version = "1", features = ["full"] }
+anyhow = "1"
+serde_json = "1"
+serde = { version = "1", features = ["derive"] }
+hex = "0.4"
+borsh = { version = "1", features = ["derive"] }
+near-sdk = { version = "=5.30.1", features = ["unstable", "unit-testing"] }
+
+[profile.release]
+codegen-units = 1
+opt-level = "z"
+lto = true
+debug = false
+panic = "abort"
+overflow-checks = true

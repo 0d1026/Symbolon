@@ -1,0 +1,21 @@
+[package]
+name = "mock_verifier"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Sandbox-only stand-in for NEAR One's TDX verifier that returns a preset answer"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+near-sdk = "=5.30.1"
+
+[profile.release]
+codegen-units = 1
+opt-level = "z"
+lto = true
+debug = false
+panic = "abort"
+overflow-checks = true
