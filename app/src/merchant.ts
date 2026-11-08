@@ -1,4 +1,8 @@
+import { createPublicKey, verify } from "node:crypto";
+import { appendFileSync, existsSync, readFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import {
   MERCHANT,
   NETWORK,
@@ -22,24 +26,18 @@ const PRICE = process.env.PRICE_BASE_UNITS ?? "2000000";
 const MEMO = "market data feed";
 const PATH = "/data/market-feed";
 
-const MAX_OPEN_INVOICES = 1000;
 const INVOICE_TTL_SECONDS = 600;
+const PROOF_GRACE_SECONDS = 24 * 60 * 60;
 
-type InvoiceState = "open" | "verifying" | "served";
-const signer = invoiceSigner("merchant-invoice-testnet.json");
-const issued = new Map<string, { invoice: string; exp: number; state: InvoiceState }>();
+const invoiceKey = invoiceSigner("merchant-invoice-testnet.json");
+const invoicePublicKey = createPublicKey(invoiceKey);
+const SERVED_FILE = process.env.SERVED_FILE ?? join(homedir(), ".symbolon", "merchant-served.txt");
+const served = new Set<string>(existsSync(SERVED_FILE) ? readFileSync(SERVED_FILE, "utf8").split("\n").filter(Boolean) : []);
+const verifying = new Set<string>();
 
-function pruneExpired(): void {
-  const now = Math.floor(Date.now() / 1000);
-  for (const [id, r] of issued) {
-    if (r.state === "open" && r.exp <= now) issued.delete(id);
-  }
-}
-
-function openInvoices(): number {
-  let n = 0;
-  for (const r of issued.values()) if (r.state !== "served") n++;
-  return n;
+function markServed(id: string): void {
+  appendFileSync(SERVED_FILE, `${id}\n`, { mode: 0o600 });
+  served.add(id);
 }
 
 function resourceOf(req: IncomingMessage): PaymentRequired["resource"] {
@@ -51,15 +49,7 @@ function resourceOf(req: IncomingMessage): PaymentRequired["resource"] {
 }
 
 function paymentRequired(req: IncomingMessage, res: ServerResponse, error: string): void {
-  pruneExpired();
-  if (openInvoices() >= MAX_OPEN_INVOICES) {
-    res.writeHead(503, { "Content-Type": "application/json", "Retry-After": "60" });
-    res.end(JSON.stringify({ error: "too many open invoices, retry later" }));
-    console.log("503 open invoice limit reached");
-    return;
-  }
-  const inv = makeInvoice(signer, MERCHANT, PRICE, MEMO, INVOICE_TTL_SECONDS);
-  issued.set(inv.id, { invoice: inv.text, exp: inv.exp, state: "open" });
+  const inv = makeInvoice(invoiceKey, MERCHANT, PRICE, MEMO, INVOICE_TTL_SECONDS);
   const requirements: PaymentRequirements = {
     scheme: SCHEME,
     network: NETWORK,
@@ -86,38 +76,59 @@ async function verifyPayment(header: string): Promise<{ ok: true; invoiceId: str
   if (p.x402Version !== 2 || a?.scheme !== SCHEME || a.network !== NETWORK || a.payTo !== MERCHANT || a.asset !== USDC || a.amount !== PRICE) {
     return { ok: false, reason: "payment does not match this resource's requirements" };
   }
+  const text = a.extra?.symbolon?.invoice;
+  const sigHex = a.extra?.symbolon?.invoiceSig;
+  if (typeof text !== "string" || typeof sigHex !== "string") return { ok: false, reason: "missing invoice" };
   let inv;
   try {
-    inv = parseInvoice(a.extra.symbolon.invoice);
+    inv = parseInvoice(text);
   } catch {
     return { ok: false, reason: "malformed invoice" };
   }
-  const record = issued.get(inv.id);
-  if (!record || record.invoice !== a.extra.symbolon.invoice) return { ok: false, reason: "invoice was not issued by this merchant" };
-  if (record.state === "served") return { ok: false, reason: "invoice already served" };
-  if (record.state === "verifying") return { ok: false, reason: "invoice payment is already being verified" };
-  const { transaction, payer } = p.payload ?? {};
+  const sigOk = /^[0-9a-f]{128}$/.test(sigHex) && verify(null, Buffer.from(text), invoicePublicKey, Buffer.from(sigHex, "hex"));
+  if (!sigOk || inv.payee !== MERCHANT || inv.amount !== PRICE || inv.memo !== MEMO) {
+    return { ok: false, reason: "invoice was not issued by this merchant" };
+  }
+  if (inv.exp + PROOF_GRACE_SECONDS < Math.floor(Date.now() / 1000)) {
+    return { ok: false, reason: "invoice expired more than a day ago" };
+  }
+  if (served.has(inv.id)) return { ok: false, reason: "invoice already served" };
+  if (verifying.has(inv.id)) return { ok: false, reason: "invoice payment is already being verified" };
+  const { transaction, payer, signer } = p.payload ?? {};
   if (typeof transaction !== "string" || typeof payer !== "string") return { ok: false, reason: "payload needs transaction and payer" };
+  if (signer !== undefined && typeof signer !== "string") return { ok: false, reason: "payload signer must be an account id" };
 
-  record.state = "verifying";
-  const result = await checkTransaction(transaction, payer, inv.id);
-  record.state = result.ok ? "served" : "open";
-  return result;
+  verifying.add(inv.id);
+  try {
+    const result = await checkTransaction(transaction, payer, signer ?? payer, inv.id);
+    if (!result.ok) return result;
+    try {
+      markServed(inv.id);
+    } catch (e) {
+      return { ok: false, reason: `cannot record served invoice: ${(e as Error).message}` };
+    }
+    return result;
+  } finally {
+    verifying.delete(inv.id);
+  }
 }
 
 async function checkTransaction(
   transaction: string,
   payer: string,
+  signer: string,
   invoiceId: string,
 ): Promise<{ ok: true; invoiceId: string; settlement: SettlementResponse } | { ok: false; reason: string }> {
   let t;
   try {
-    t = await txOutcome(transaction, payer);
+    t = await txOutcome(transaction, signer);
   } catch (e) {
-    return { ok: false, reason: `transaction not found for ${payer}: ${(e as Error).message}` };
+    return { ok: false, reason: `transaction not found for ${signer}: ${(e as Error).message}` };
   }
-  if (t.signer !== payer || t.receiver !== payer || !t.methods.includes("pay")) {
-    return { ok: false, reason: "transaction is not a pay call on the payer's wallet" };
+  const agentPaid = t.signer === payer && t.receiver === payer && t.methods.includes("pay");
+  const ownerApproved = t.receiver === payer && t.methods.includes("approve_held");
+  if (!agentPaid && !ownerApproved) {
+    return { ok: false, reason: "transaction is not a pay or approve_held call on the payer's wallet" };
   }
   if (!t.ok || t.value !== "paid") return { ok: false, reason: `wallet did not pay: ${t.value ?? t.failure}` };
   const transfer = t.events.find((e) => {
@@ -167,4 +178,6 @@ const server = createServer(async (req, res) => {
   console.log(`200 served invoice ${v.invoiceId} for transaction ${v.settlement.transaction}`);
 });
 
-server.listen(PORT, () => console.log(`merchant ${MERCHANT} listening on http://localhost:${PORT}${PATH}`));
+server.listen(PORT, () =>
+  console.log(`merchant ${MERCHANT} listening on http://localhost:${PORT}${PATH}, ${served.size} served invoices in ${SERVED_FILE}`),
+);

@@ -20,6 +20,8 @@ const MAX_MEMO_LEN: usize = 64;
 const MAX_RESPONSE_LEN: usize = 16 * 1024;
 const DAY_MS: u64 = 24 * 60 * 60 * 1000;
 const AGENT_METHODS: &str = "request_nonce,pay";
+const UPDATE_MIN_GAS: Gas = Gas::from_tgas(150);
+const MIGRATE_GAS: Gas = Gas::from_tgas(50);
 
 /// Exact request bytes the owner approves:
 /// `prefix + nonce + middle + invoice + suffix`. `model_id` is the model name
@@ -124,6 +126,10 @@ impl Symbolon {
             invoice_hash.len() == 64 && invoice_hash.bytes().all(|b| b.is_ascii_hexdigit()),
             "invoice_hash must be 32 bytes of hex"
         );
+        require!(
+            !self.refused_invoices.contains(&invoice_hash),
+            "invoice was refused and cannot be retried"
+        );
         self.prune_pay_nonces();
         require!(
             self.pay_nonces.contains_key(&invoice_hash)
@@ -197,7 +203,7 @@ impl Symbolon {
             self.check_payment(&inv, &merchant, &invoice, &pn.nonce, &response, &signature);
         let (request_hash, response_hash) = match checked {
             Ok(hashes) => hashes,
-            Err((reason, request_hash, response_hash)) => {
+            Err((reason, request_hash, response_hash, final_refusal)) => {
                 emit(
                     "payment_refused",
                     &[
@@ -209,6 +215,9 @@ impl Symbolon {
                         ("response_hash", &response_hash),
                     ],
                 );
+                if final_refusal {
+                    self.refused_invoices.insert(invoice_hash);
+                }
                 return PromiseOrValue::Value(format!("refused: {reason}"));
             }
         };
@@ -436,13 +445,25 @@ impl Symbolon {
         emit("unfrozen", &[]);
     }
 
-    /// Owner: replace this contract's code with the raw wasm passed as input.
-    /// The new code must read the existing state layout.
+    /// Owner: replace this contract's code with the raw wasm passed as input,
+    /// then call the new code's `migrate` in the same receipt. If `migrate`
+    /// fails, the deploy is undone and the old code stays.
     pub fn update_contract(&mut self) -> Promise {
         self.assert_owner();
+        require!(
+            env::prepaid_gas() >= UPDATE_MIN_GAS,
+            "attach at least 150 Tgas"
+        );
         let code = env::input().unwrap_or_else(|| env::panic_str("no code"));
         emit("contract_updated", &[]);
-        Promise::new(env::current_account_id()).deploy_contract(code)
+        Promise::new(env::current_account_id())
+            .deploy_contract(code)
+            .function_call(
+                "migrate",
+                Vec::new(),
+                NearToken::from_yoctonear(0),
+                MIGRATE_GAS,
+            )
     }
 
     pub fn get_policy_template(&self) -> Option<PolicyTemplate> {
@@ -478,12 +499,14 @@ impl Symbolon {
     }
 }
 
-type Refusal = (String, String, String);
+type Refusal = (String, String, String, bool);
 
 impl Symbolon {
     /// Steps 4 to 8: rebuild the request, check the attested signature and the
     /// decision, then the caps. Returns (request_hash, response_hash), or a
-    /// refusal reason with the hashes computed so far.
+    /// refusal: reason, hashes computed so far, and whether it is final. A final
+    /// refusal (signature or decision) blocks the invoice from new nonces; a
+    /// cap refusal does not, because the owner can change caps.
     fn check_payment(
         &mut self,
         inv: &Invoice,
@@ -497,7 +520,7 @@ impl Symbolon {
         let t = self
             .template
             .clone()
-            .ok_or_else(|| ("no policy template set".to_string(), none(), none()))?;
+            .ok_or_else(|| ("no policy template set".to_string(), none(), none(), false))?;
         let mut request = Vec::with_capacity(
             t.prefix.len() + nonce.len() + t.middle.len() + invoice.len() + t.suffix.len(),
         );
@@ -508,10 +531,11 @@ impl Symbolon {
         request.extend_from_slice(t.suffix.as_bytes());
         let rq = hex::encode(env::sha256_array(&request));
         if response.len() > MAX_RESPONSE_LEN {
-            return Err(("response too long".into(), rq, none()));
+            return Err(("response too long".into(), rq, none(), true));
         }
         let rs = hex::encode(env::sha256_array(response));
-        let fail = |reason: &str| (reason.to_string(), rq.clone(), rs.clone());
+        let fail = |reason: &str| (reason.to_string(), rq.clone(), rs.clone(), true);
+        let limit = |reason: &str| (reason.to_string(), rq.clone(), rs.clone(), false);
 
         let signer = recover_eip191_signer(&format!("{}:{}:{}", t.model_id, rq, rs), signature)
             .map_err(|e| fail(&e))?;
@@ -531,17 +555,17 @@ impl Symbolon {
             return Err(fail("decision does not match the invoice"));
         }
         if inv.amount > merchant.cap.0 {
-            return Err(fail("amount above this merchant's cap"));
+            return Err(limit("amount above this merchant's cap"));
         }
         if inv.amount > self.caps.per_payment.0 {
-            return Err(fail("amount above the per-payment cap"));
+            return Err(limit("amount above the per-payment cap"));
         }
         if self.settled.contains(&settled_key(&inv.payee, &inv.id)) {
-            return Err(fail("invoice already paid or pending"));
+            return Err(limit("invoice already paid or pending"));
         }
         self.roll_window();
         if self.window.spent.0 + self.window.pending.0 + inv.amount > self.caps.per_day.0 {
-            return Err(fail("amount above today's remaining budget"));
+            return Err(limit("amount above today's remaining budget"));
         }
         Ok((rq, rs))
     }

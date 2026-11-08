@@ -1,14 +1,14 @@
 {
- "at": "2026-11-08T15:02:34.410Z",
+ "at": "2026-11-08T19:16:31.196Z",
  "url": "http://localhost:4020/data/market-feed",
  "honest": {
-  "pay_tx": "2kj5MfBXPovzF39nCWQqxRNJ7ESc7QPxGSG2rWNmhox5",
-  "nonce_tx": "CtoVbBkaKF7iLkFGR4rPG4SNxYeTmwrpiCcExwXq3Qxg",
+  "pay_tx": "DKv4gxtNqYZzutNjj2Zpt5RgvZMsYsHEu6hCDq7uBvxE",
+  "nonce_tx": "4bnX4Jr83bmXdTdmUwuDRuDhEPXnMWbKEFDaJRUvphEm",
   "status": 200
  },
  "concurrent": {
-  "pay_tx": "DigPVhdatwdoCkNEwVaw8AW3owrcPd7fsocbRCUL2XQM",
-  "nonce_tx": "5XnwXzB8jdnePFQDwKMJ2pE7DispYooUerMusW1d99Go",
+  "pay_tx": "4sQbqpdwkWQc8NpmmSM5ALjNhY27aNqhQvkTiB8Yx8bx",
+  "nonce_tx": "6qzrjvjM2ErQLoLzKvYRRfNASH2qHdsryE3WyeKiWTQQ",
   "statuses": [
    200,
    402
@@ -46,8 +46,8 @@
   {
    "name": "transaction that is not a payment",
    "status": 402,
-   "merchant_error": "transaction is not a pay call on the payer's wallet",
-   "expected": "transaction is not a pay call",
+   "merchant_error": "transaction is not a pay or approve_held call on the payer's wallet",
+   "expected": "transaction is not a pay or approve_held call",
    "passed": true
   },
   {

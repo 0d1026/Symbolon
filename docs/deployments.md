@@ -28,7 +28,7 @@ The owner set both profiles from the measurements in the same live attestation r
 | Owner sets the `nearai-gateway` profile | `HbGXthPBr5nrBd6GJL7Kr6rKQBrmvxagdUS8ouz63UMq` |
 | Register model key `0x3b753b4406613c5e70ae640508632b600424fa0c` through the verifier | `7yQZLSy3XKan4gvC5s2om9m8uPKZBurjCAjaLzwT4tvr` |
 
-Open any transaction at `https://explorer.testnet.near.org/transactions/<transaction id>`, the link format near-cli prints.
+Open any transaction at `https://testnet.nearblocks.io/txns/<transaction id>`.
 
 After the last step, `is_key_valid` for address `0x3b753b4406613c5e70ae640508632b600424fa0c` and profile `z-ai/glm-5.3-flash` returns `true`.
 
@@ -82,3 +82,18 @@ USDC balances after both payments, read with `ft_balance_of`:
 | --- | --- |
 | `symbolon-merchant.testnet` | 4,000,000 (4 USDC) |
 | `v2.symbolon.testnet` | 996,000,000 (996 USDC, from 1,000) |
+
+## Testnet v2 upgrade (2026-11-08)
+
+The first deployed build had no `migrate`, so the upgrade was a single transaction from the wallet's deployment key: deploy the new production build and call `migrate` in the same receipt. The sandbox test `deployed_v2_state_migrates_to_the_current_build` runs the same migration from the exact code that was deployed (code hash `2HdCEMJF33FRmEdCbddtuB21g7pQH9MdH8wfF7hDupYa`).
+
+| Step | Transaction |
+| --- | --- |
+| Deploy the new build and `migrate`; new code hash `4rNTAVsubhxMUGERxLQ8HtpyHSDccpiF3dpgf8q1GMWY` | `7aaxykzmYNbipm3hczGenfn9J1VA8ue5hruhgrtf8SrH` |
+| Owner sets `key_ttl_ms` to 2,592,000,000 (30 days) | `ApobSMPQKBa6Hqqpn2XiJdLudeLyAPExowpUmyEPYkG4` |
+| Re-register model key `0x3b753b4406613c5e70ae640508632b600424fa0c` with nonce `ab721739d8cd2a354cded9e832664a5a047860e6c722a8b6d7cc083e0ecab82f` | `4wi6DGRzTxii67rrXiU7944JekDeuySVVm5Lj1VBoxbz` |
+| Re-register gateway key `0xb98a789cdc4817275f5155593ba73ef2a957e779` with nonce `ff8ab2a44eff6ca7414f7c8e7994319677c216350f0c2c2f39f11ff8b7ec81da` | `LxLKsMgno5hXMF3kePZXBeesuQbr4NcqS8YbcbqKT7a` |
+
+The views `get_config`, `get_caps`, `get_policy_template`, `get_agent_key`, `get_spend_window` and `is_frozen` returned identical bytes before and after the upgrade. Both keys now expire on 2026-12-08 around 19:14 UTC.
+
+A gateway registration attempt between the two listed above failed with `Failed to deserialize input from Borsh` (`8sm4VtgJyMTxKi1VT4gow2w3USX5dWgBSLvREM8ovuw3`): its attestation capture had failed on a network error, so the call was sent with empty arguments. Its nonce expired unused.

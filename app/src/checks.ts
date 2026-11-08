@@ -59,7 +59,7 @@ async function main(): Promise<void> {
   const third = await freshRequirements(url);
   record(
     "transaction that is not a payment",
-    "transaction is not a pay call",
+    "transaction is not a pay or approve_held call",
     await send(url, { ...paid, accepted: third.accepts[0], payload: { ...paid.payload, transaction: String(honest.nonceTx) } }),
   );
 

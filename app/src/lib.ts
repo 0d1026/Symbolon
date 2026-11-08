@@ -104,7 +104,7 @@ export interface PaymentPayload {
   x402Version: 2;
   resource: PaymentRequired["resource"];
   accepted: PaymentRequirements;
-  payload: { transaction: string; payer: string };
+  payload: { transaction: string; payer: string; signer?: string };
 }
 
 export interface SettlementResponse {

@@ -32,7 +32,7 @@ async fn pays_an_approved_invoice_end_to_end() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-async fn refuses_when_the_model_refuses_and_burns_the_nonce() -> anyhow::Result<()> {
+async fn refuses_when_the_model_refuses_and_blocks_the_invoice() -> anyhow::Result<()> {
     let p = pay_env().await?;
     let s = p.submission("gift_cards", "gift_cards");
     p.issue_pay_nonce("gift_cards", &s.invoice).await?;
@@ -47,6 +47,14 @@ async fn refuses_when_the_model_refuses_and_burns_the_nonce() -> anyhow::Result<
 
     let again = p.pay_as(&p.agent, &s, 100).await?;
     assert_fails_with(again, "no payment nonce for this invoice");
+
+    let retry = p
+        .agent
+        .call(p.e.wallet.id(), "request_nonce")
+        .args_json(json!({ "invoice_hash": sha256_hex(s.invoice.as_bytes()) }))
+        .transact()
+        .await?;
+    assert_fails_with(retry, "invoice was refused and cannot be retried");
     Ok(())
 }
 

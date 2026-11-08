@@ -197,7 +197,8 @@ async fn rejects_tcb_status_outside_owner_policy() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-async fn rejects_key_already_registered_under_another_profile() -> anyhow::Result<()> {
+async fn rejects_key_already_registered_under_another_profile_without_burning_the_nonce(
+) -> anyhow::Result<()> {
     let e = setup().await?;
     let c = e.fx.candidates.model.clone();
     set_profile(&e, "copy-of-model", &c.measurements).await?;
@@ -212,6 +213,8 @@ async fn rejects_key_already_registered_under_another_profile() -> anyhow::Resul
         "{logs:?}"
     );
     assert!(is_valid(&e, &c.signing_address, MODEL).await?);
+    let (ok, logs, _) = register(&e, MODEL, &c.signing_address, &c, quote_of(&c)).await?;
+    assert!(ok, "the conflict must not burn the nonce: {logs:?}");
     Ok(())
 }
 
@@ -316,7 +319,7 @@ async fn policy_change_invalidates_existing_keys() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-async fn owner_can_revoke_a_key() -> anyhow::Result<()> {
+async fn owner_can_revoke_a_key_and_it_stays_revoked() -> anyhow::Result<()> {
     let e = setup().await?;
     issue_fixture_nonce(&e).await?;
     let c = e.fx.candidates.model.clone();
@@ -324,6 +327,18 @@ async fn owner_can_revoke_a_key() -> anyhow::Result<()> {
     assert!(ok);
     owner_call(&e, "revoke_key", json!({"address": c.signing_address})).await?;
     assert!(!is_valid(&e, &c.signing_address, MODEL).await?);
+
+    issue_fixture_nonce(&e).await?;
+    assert_fails_with(
+        register_raw(&e, MODEL, &c.signing_address, &c, 300).await?,
+        "key is revoked",
+    );
+    assert!(!is_valid(&e, &c.signing_address, MODEL).await?);
+
+    owner_call(&e, "unrevoke_key", json!({"address": c.signing_address})).await?;
+    let (ok, logs, _) = register(&e, MODEL, &c.signing_address, &c, quote_of(&c)).await?;
+    assert!(ok, "{logs:?}");
+    assert!(is_valid(&e, &c.signing_address, MODEL).await?);
     Ok(())
 }
 
@@ -364,6 +379,10 @@ async fn only_owner_can_change_policy() -> anyhow::Result<()> {
         ("set_key_ttl_ms", json!({"key_ttl_ms": 1u64})),
         (
             "revoke_key",
+            json!({"address": e.fx.candidates.model.signing_address}),
+        ),
+        (
+            "unrevoke_key",
             json!({"address": e.fx.candidates.model.signing_address}),
         ),
         ("set_verifier", json!({"verifier": e.relayer.id()})),
@@ -562,5 +581,29 @@ async fn reregistering_refreshes_the_key_lifetime() -> anyhow::Result<()> {
     let second = get_key(&e, &c.signing_address).await?.expect("record");
     assert!(second.registered_at_ms >= first.registered_at_ms + 5_000);
     assert!(second.expires_at_ms >= first.expires_at_ms + 5_000);
+    Ok(())
+}
+
+#[tokio::test]
+async fn narrowing_accepted_tcb_statuses_invalidates_existing_keys() -> anyhow::Result<()> {
+    let e = setup().await?;
+    issue_fixture_nonce(&e).await?;
+    let c = e.fx.candidates.model.clone();
+    let (ok, _, _) = register(&e, MODEL, &c.signing_address, &c, quote_of(&c)).await?;
+    assert!(ok);
+    owner_call(
+        &e,
+        "set_accepted_tcb_statuses",
+        json!({"statuses": ["SWHardeningNeeded"]}),
+    )
+    .await?;
+    assert!(!is_valid(&e, &c.signing_address, MODEL).await?);
+    owner_call(
+        &e,
+        "set_accepted_tcb_statuses",
+        json!({"statuses": ["UpToDate"]}),
+    )
+    .await?;
+    assert!(is_valid(&e, &c.signing_address, MODEL).await?);
     Ok(())
 }

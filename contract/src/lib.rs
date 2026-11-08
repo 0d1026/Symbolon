@@ -50,6 +50,8 @@ enum StorageKey {
     PayNonces,
     Settled,
     Held,
+    Revoked,
+    RefusedInvoices,
 }
 
 /// Measurements the owner accepts for one kind of enclave, for example the
@@ -107,8 +109,36 @@ pub struct Symbolon {
     /// Lowercase hex nonce -> expiry. Expired entries are pruned.
     nonces: IterableMap<String, NonceRecord>,
     nonce_counter: u64,
+    usdc: AccountId,
+    agent_pk: Option<PublicKey>,
+    template: Option<PolicyTemplate>,
+    merchants: IterableMap<AccountId, Merchant>,
+    caps: Caps,
+    window: SpendWindow,
+    pay_nonces: IterableMap<String, PayNonce>,
+    settled: LookupSet<String>,
+    held: IterableMap<u64, HeldPayment>,
+    next_held_id: u64,
+    frozen: bool,
+    revoked: LookupSet<String>,
+    refused_invoices: LookupSet<String>,
     #[cfg(feature = "test-nonce")]
     test_next_nonce: Option<String>,
+}
+
+/// State layout of the build deployed at `v2.symbolon.testnet` on 2026-11-07,
+/// read once by `migrate`.
+#[near(serializers = [borsh])]
+struct StateV2 {
+    owner: AccountId,
+    pending_owner: Option<AccountId>,
+    verifier: AccountId,
+    accepted_tcb_statuses: Vec<String>,
+    key_ttl_ms: u64,
+    profiles: IterableMap<String, MeasurementProfile>,
+    keys: IterableMap<String, KeyRecord>,
+    nonces: IterableMap<String, NonceRecord>,
+    nonce_counter: u64,
     usdc: AccountId,
     agent_pk: Option<PublicKey>,
     template: Option<PolicyTemplate>,
@@ -137,8 +167,6 @@ impl Symbolon {
             keys: IterableMap::new(StorageKey::Keys),
             nonces: IterableMap::new(StorageKey::Nonces),
             nonce_counter: 0,
-            #[cfg(feature = "test-nonce")]
-            test_next_nonce: None,
             usdc,
             agent_pk: None,
             template: None,
@@ -150,6 +178,51 @@ impl Symbolon {
             held: IterableMap::new(StorageKey::Held),
             next_held_id: 0,
             frozen: false,
+            revoked: LookupSet::new(StorageKey::Revoked),
+            refused_invoices: LookupSet::new(StorageKey::RefusedInvoices),
+            #[cfg(feature = "test-nonce")]
+            test_next_nonce: None,
+        }
+    }
+
+    /// Runs after every `update_contract`, in the same receipt as the code
+    /// deploy, so a migration failure also undoes the deploy. Reads the current
+    /// layout, or the layout deployed at `v2.symbolon.testnet`.
+    #[private]
+    #[init(ignore_state)]
+    pub fn migrate() -> Self {
+        let raw =
+            env::storage_read(b"STATE").unwrap_or_else(|| env::panic_str("no state to migrate"));
+        if let Ok(current) = borsh::from_slice::<Self>(&raw) {
+            return current;
+        }
+        let old: StateV2 =
+            borsh::from_slice(&raw).unwrap_or_else(|_| env::panic_str("unknown state layout"));
+        Self {
+            owner: old.owner,
+            pending_owner: old.pending_owner,
+            verifier: old.verifier,
+            accepted_tcb_statuses: old.accepted_tcb_statuses,
+            key_ttl_ms: old.key_ttl_ms,
+            profiles: old.profiles,
+            keys: old.keys,
+            nonces: old.nonces,
+            nonce_counter: old.nonce_counter,
+            usdc: old.usdc,
+            agent_pk: old.agent_pk,
+            template: old.template,
+            merchants: old.merchants,
+            caps: old.caps,
+            window: old.window,
+            pay_nonces: old.pay_nonces,
+            settled: old.settled,
+            held: old.held,
+            next_held_id: old.next_held_id,
+            frozen: old.frozen,
+            revoked: LookupSet::new(StorageKey::Revoked),
+            refused_invoices: LookupSet::new(StorageKey::RefusedInvoices),
+            #[cfg(feature = "test-nonce")]
+            test_next_nonce: None,
         }
     }
 
@@ -196,6 +269,7 @@ impl Symbolon {
             "attach at least 240 Tgas"
         );
         let address = normalize_address(&signing_address);
+        require!(!self.revoked.contains(&address), "key is revoked");
         let p = self.profiles.get(&profile).unwrap_or_else(|| {
             env::panic_str("unknown profile");
         });
@@ -241,14 +315,7 @@ impl Symbolon {
         compose_hash: String,
         submitter: AccountId,
     ) -> bool {
-        let checked = self
-            .check_verifier_result(&profile, &address, &compose_hash)
-            .and_then(|ok| match self.keys.get(&address) {
-                Some(existing) if existing.profile != profile => {
-                    Err("address already registered under another profile".to_string())
-                }
-                _ => Ok(ok),
-            });
+        let checked = self.check_verifier_result(&profile, &address, &compose_hash);
         match checked {
             Ok(m) => {
                 let now = env::block_timestamp_ms();
@@ -349,11 +416,21 @@ impl Symbolon {
         self.key_ttl_ms = key_ttl_ms;
     }
 
+    /// Removes the key and blocks it from being registered again until
+    /// `unrevoke_key`.
     pub fn revoke_key(&mut self, address: String) {
         self.assert_owner();
         let a = normalize_address(&address);
         self.keys.remove(&a);
+        self.revoked.insert(a.clone());
         emit("key_revoked", &[("address", &a)]);
+    }
+
+    pub fn unrevoke_key(&mut self, address: String) {
+        self.assert_owner();
+        let a = normalize_address(&address);
+        self.revoked.remove(&a);
+        emit("key_unrevoked", &[("address", &a)]);
     }
 
     /// Test builds only: fix the next nonce so a captured report can be replayed.
@@ -404,7 +481,11 @@ impl Symbolon {
         let Some(k) = self.keys.get(address) else {
             return false;
         };
-        if k.profile != profile || k.expires_at_ms <= env::block_timestamp_ms() {
+        if k.profile != profile
+            || k.expires_at_ms <= env::block_timestamp_ms()
+            || self.revoked.contains(address)
+            || !self.accepted_tcb_statuses.contains(&k.tcb_status)
+        {
             return false;
         }
         // Policy changes apply at once: a key is only as good as the
@@ -469,6 +550,14 @@ impl Symbolon {
             address,
             compose_hash,
         )?;
+        if self.revoked.contains(address) {
+            return Err("key is revoked".into());
+        }
+        if let Some(existing) = self.keys.get(address) {
+            if existing.profile != profile {
+                return Err("address already registered under another profile".into());
+            }
+        }
         let n = self.nonces.remove(&nonce).ok_or_else(|| {
             "nonce was not issued by this contract or was already used".to_string()
         })?;
@@ -756,7 +845,8 @@ mod tests {
 
     #[test]
     fn rejects_runtime_measurements_missing_from_allowlist() {
-        let cases: [(&str, fn(&mut MeasurementProfile)); 3] = [
+        type Mutation = fn(&mut MeasurementProfile);
+        let cases: [(&str, Mutation); 3] = [
             ("rt_mr0 not allowlisted", |p| {
                 p.rt_mr0 = vec![hex::encode([0xaa; 48])]
             }),

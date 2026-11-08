@@ -24,12 +24,15 @@ Needs the agent key and merchant invoice key in `~/.symbolon` and a NEAR AI key 
 4. Agent sends the owner's policy request with that nonce and invoice to NEAR AI and gets a `provider_tee` signed decision. It checks the signed hashes against the exact bytes before spending gas.
 5. Agent calls `pay`. The wallet runs every check and transfers USDC.
 6. Agent retries the request with a `PAYMENT-SIGNATURE` header holding the transaction hash.
-7. Merchant reads that transaction from testnet RPC and requires all of:
-   - the transaction is a `pay` call signed by and sent to the payer's wallet;
-   - `pay` returned `paid`;
-   - the USDC contract emitted `ft_transfer` from the wallet to the merchant, for the invoice amount, with memo `symbolon invoice <id>`;
-   - the invoice was issued by this merchant and not served before.
-8. Merchant answers `200` with the data and a `PAYMENT-RESPONSE` settlement header.
+7. Merchant checks the proof and requires all of:
+   - the invoice in the proof carries the merchant's own ed25519 signature, with this resource's payee, price and memo; the merchant keeps no state for unpaid invoices;
+   - the invoice id has not been served and is not being verified by another request;
+   - the transaction, read from testnet RPC, is either a `pay` call signed by and sent to the payer's wallet, or an `approve_held` call sent to the payer's wallet (then `payload.signer` names the owner who signed it);
+   - that call returned `paid`;
+   - the USDC contract emitted `ft_transfer` from the wallet to the merchant, for the invoice amount, with memo `symbolon invoice <id>`.
+8. Merchant answers `200` with the data and a `PAYMENT-RESPONSE` settlement header, and records the invoice id as served.
+
+A proof sent after the invoice's `exp` is accepted for one day, because the wallet already checked `exp` when it paid; after that it is refused.
 
 ## x402 mapping
 
@@ -41,19 +44,37 @@ Needs the agent key and merchant invoice key in `~/.symbolon` and a NEAR AI key 
 | `payTo` | `symbolon-merchant.testnet` |
 | `extra.paymentFlow` | `upfront`: the client pays before the resource runs |
 | `extra.symbolon` | the signed invoice and the wallet account |
-| `payload` | `{ transaction, payer }` |
+| `payload` | `{ transaction, payer }`, plus `signer` when the transaction is the owner's `approve_held` |
 
 This is a custom scheme. It follows the spec's headers and the `upfront` payment flow, but it is not the merged NEAR `exact` scheme, which needs a full-access key on the paying account. No facilitator is involved: the merchant verifies the transaction on chain itself.
 
-## Live run on testnet, 2026-11-08
+## Live runs on testnet, 2026-11-08
+
+Before the wallet upgrade:
 
 | Purchase | `request_nonce` | `pay` | Merchant answer |
 | --- | --- | --- | --- |
 | First purchase | `DKjyKEPTADAyQakE4iDCSRAhKnGC1R5fbHTgYX9u9rgR` | `6tNtW67eGhzGbqTnF4T7CeLCvWY88guenuVjrZxnAnJm` | `200` with settlement |
-| Purchase used by the checks | `CtoVbBkaKF7iLkFGR4rPG4SNxYeTmwrpiCcExwXq3Qxg` | `2kj5MfBXPovzF39nCWQqxRNJ7ESc7QPxGSG2rWNmhox5` | `200` with settlement |
-| Purchase used by the concurrency check | `5XnwXzB8jdnePFQDwKMJ2pE7DispYooUerMusW1d99Go` | `DigPVhdatwdoCkNEwVaw8AW3owrcPd7fsocbRCUL2XQM` | one `200`, one `402` |
 
-Each purchase paid 2 USDC. NEAR AI signed both decisions with the attested key `0x3b753b4406613c5e70ae640508632b600424fa0c`.
+After the wallet upgrade and with the stateless merchant:
+
+| Purchase | `request_nonce` | `pay` | Merchant answer |
+| --- | --- | --- | --- |
+| Purchase used by the checks | `4bnX4Jr83bmXdTdmUwuDRuDhEPXnMWbKEFDaJRUvphEm` | `DKv4gxtNqYZzutNjj2Zpt5RgvZMsYsHEu6hCDq7uBvxE` | `200` with settlement |
+| Purchase used by the concurrency check | `6qzrjvjM2ErQLoLzKvYRRfNASH2qHdsryE3WyeKiWTQQ` | `4sQbqpdwkWQc8NpmmSM5ALjNhY27aNqhQvkTiB8Yx8bx` | one `200`, one `402` |
+
+Each purchase paid 2 USDC. NEAR AI signed every decision with the attested key `0x3b753b4406613c5e70ae640508632b600424fa0c`.
+
+## Held purchase
+
+A second merchant priced at 15 USDC, above the wallet's 10 USDC approval threshold, run by `src/held.ts`. Raw result: `agent-merchant-held.json`.
+
+| Step | Transaction | Result |
+| --- | --- | --- |
+| Agent `pay` | `XRZqtFxSCrCbSb8t5Wdoyctf5rxFXox8aU42CYFFxBW` | `held:2` |
+| Proof with the held `pay` transaction | | `402`: wallet did not pay: held:2 |
+| Owner `approve_held(2)` | `Eq5piVqmeGUtYu6f39cVuuDkYg41HFQNLhqtNS5sZGMS` | `paid` |
+| Proof with the owner's approval, `signer` `symbolon.testnet` | | `200` with settlement |
 
 ## Merchant refusals
 
@@ -65,12 +86,11 @@ Run by `src/checks.ts` against the live merchant. Raw result: `agent-merchant-ch
 | Reuse the paid proof | `402`: invoice already served |
 | Claim the paid transaction for a new invoice | `402`: no USDC transfer to this merchant for this invoice |
 | Proof pointing at a refused `pay` (`4K3FyWkTVmePfbVo7NLgAN7HCDCYXr6xTk9LchThjYNB`) | `402`: wallet did not pay: refused: decision not signed by an attested model key for this request |
-| Proof pointing at a `request_nonce` transaction | `402`: transaction is not a pay call on the payer's wallet |
+| Proof pointing at a `request_nonce` transaction | `402`: transaction is not a pay or approve_held call on the payer's wallet |
 | The same fresh proof sent twice at the same moment | one `200`; the other `402`: invoice payment is already being verified |
 
 ## Limits
 
-- The agent pays before the merchant serves. If the merchant is down after `pay` succeeds, the agent has paid and has no data. The transaction hash stays valid proof, so the agent can retry until the invoice expires.
-- Invoices expire after 10 minutes. The merchant holds at most 1,000 unserved invoices and answers `503` above that. In a local run of 1,001 unpaid requests, every request past the limit got `503`.
-- The merchant keeps issued invoices in memory. A restart forgets them, so a proof for an invoice issued before the restart is refused.
+- The agent pays before the merchant serves. If the merchant is down after `pay` succeeds, the agent retries later with the same proof; it stays valid for one day after the invoice expires.
+- The merchant keeps only served invoice ids, one per real payment. Each id is appended to `~/.symbolon/merchant-served.txt` (or `SERVED_FILE`) before the data is sent and reloaded on start, so a proof served before a restart is refused after it. If the file cannot be written, the proof is refused.
 - The data served is a static sample, marked `"sample": true`.

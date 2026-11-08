@@ -2,7 +2,7 @@
 
 Six attacks against `v2.symbolon.testnet` on 2026-11-07. Run them with `node scripts/attacks.mjs <attack|all>`. The raw record of every run, including request hashes and model answers, is in `attacks-testnet.json`.
 
-Open any transaction at `https://explorer.testnet.near.org/transactions/<transaction id>`.
+Open any transaction at `https://testnet.nearblocks.io/txns/<transaction id>`.
 
 ## Results
 

@@ -1,0 +1,26 @@
+{
+ "at": "2026-11-08T19:17:35.937Z",
+ "url": "http://localhost:4021/data/market-feed",
+ "pay_tx": "XRZqtFxSCrCbSb8t5Wdoyctf5rxFXox8aU42CYFFxBW",
+ "nonce_tx": "8BBZBCFVbgsshcQvZ41nP3A2LyPmEftAs5oLxZAt38he",
+ "pay_result": "held:2",
+ "proof_with_held_pay_status": 402,
+ "proof_with_held_pay_error": "wallet did not pay: held:2",
+ "approve_tx": "Eq5piVqmeGUtYu6f39cVuuDkYg41HFQNLhqtNS5sZGMS",
+ "proof_with_approval_status": 200,
+ "served": {
+  "feed": "demo market data snapshot",
+  "sample": true,
+  "at": "2026-11-08T19:17:35.934Z",
+  "quotes": [
+   {
+    "symbol": "NEAR",
+    "usd": "3.79"
+   },
+   {
+    "symbol": "USDC",
+    "usd": "1.00"
+   }
+  ]
+ }
+}

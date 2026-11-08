@@ -24,6 +24,8 @@ export interface Purchase {
   proof: PaymentPayload | null;
   payTx: string | null;
   nonceTx: string | null;
+  payValue: string | null;
+  required: PaymentRequired | null;
 }
 
 export async function purchase(url: string, fetchData = true): Promise<Purchase> {
@@ -31,7 +33,7 @@ export async function purchase(url: string, fetchData = true): Promise<Purchase>
   if (first.status !== 402) {
     console.log(`status ${first.status}, no payment needed`);
     console.log(await first.text());
-    return { status: first.status, proof: null, payTx: null, nonceTx: null };
+    return { status: first.status, proof: null, payTx: null, nonceTx: null, payValue: null, required: null };
   }
   const header = first.headers.get("payment-required");
   if (!header) throw new Error("402 without PAYMENT-REQUIRED header");
@@ -57,7 +59,7 @@ export async function purchase(url: string, fetchData = true): Promise<Purchase>
   console.log(`pay ${paid.tx} -> ${paid.value ?? paid.failure}`);
   if (paid.value !== "paid") {
     console.log("payment not made, stopping");
-    return { status: 0, proof: null, payTx: paid.tx, nonceTx: n.tx };
+    return { status: 0, proof: null, payTx: paid.tx, nonceTx: n.tx, payValue: paid.value, required };
   }
 
   const proof: PaymentPayload = {
@@ -66,13 +68,13 @@ export async function purchase(url: string, fetchData = true): Promise<Purchase>
     accepted,
     payload: { transaction: paid.tx, payer: WALLET },
   };
-  if (!fetchData) return { status: 0, proof, payTx: paid.tx, nonceTx: n.tx };
+  if (!fetchData) return { status: 0, proof, payTx: paid.tx, nonceTx: n.tx, payValue: paid.value, required };
   const second = await fetchRetry(url, { headers: { "PAYMENT-SIGNATURE": b64json(proof) } });
   const settlement = second.headers.get("payment-response");
   console.log(`status ${second.status}`);
   if (settlement) console.log(`settlement ${JSON.stringify(unb64json<SettlementResponse>(settlement))}`);
   console.log(await second.text());
-  return { status: second.status, proof, payTx: paid.tx, nonceTx: n.tx };
+  return { status: second.status, proof, payTx: paid.tx, nonceTx: n.tx, payValue: paid.value, required };
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {

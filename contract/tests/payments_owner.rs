@@ -311,7 +311,7 @@ async fn owner_configuration_is_validated_and_owner_only() -> anyhow::Result<()>
 }
 
 #[tokio::test]
-async fn owner_can_upgrade_the_code_and_state_survives() -> anyhow::Result<()> {
+async fn upgrade_runs_migrate_and_rolls_back_bad_code() -> anyhow::Result<()> {
     let p = pay_env().await?;
     let caps_before: serde_json::Value = p.e.wallet.view("get_caps").await?.json()?;
     let code = std::fs::read(TEST_WASM)?;
@@ -324,6 +324,20 @@ async fn owner_can_upgrade_the_code_and_state_survives() -> anyhow::Result<()> {
             .transact()
             .await?;
     assert_fails_with(res, "owner only");
+
+    let code_before = p.e.wallet.view_account().await?.contract_state;
+    let without_migrate = std::fs::read(USDC_WASM)?;
+    let res =
+        p.e.owner
+            .call(p.e.wallet.id(), "update_contract")
+            .args(without_migrate)
+            .gas(Gas::from_tgas(300))
+            .transact()
+            .await?;
+    assert!(res.is_failure(), "code without migrate must not deploy");
+    assert_eq!(p.e.wallet.view_account().await?.contract_state, code_before);
+    let caps_kept: serde_json::Value = p.e.wallet.view("get_caps").await?.json()?;
+    assert_eq!(caps_before, caps_kept);
 
     p.e.owner
         .call(p.e.wallet.id(), "update_contract")
