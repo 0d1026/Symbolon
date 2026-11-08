@@ -1,0 +1,24 @@
+{
+  "name": "symbolon-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "near-api-js": "7.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "20.19.25",
+    "tsx": "4.20.6",
+    "typescript": "5.9.3"
+  },
+  "scripts": {
+    "merchant": "tsx src/merchant.ts",
+    "agent": "tsx src/agent.ts",
+    "typecheck": "tsc -p .",
+    "checks": "tsx src/checks.ts"
+  }
+}

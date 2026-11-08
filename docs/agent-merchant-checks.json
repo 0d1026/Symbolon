@@ -1,0 +1,61 @@
+{
+ "at": "2026-11-08T15:02:34.410Z",
+ "url": "http://localhost:4020/data/market-feed",
+ "honest": {
+  "pay_tx": "2kj5MfBXPovzF39nCWQqxRNJ7ESc7QPxGSG2rWNmhox5",
+  "nonce_tx": "CtoVbBkaKF7iLkFGR4rPG4SNxYeTmwrpiCcExwXq3Qxg",
+  "status": 200
+ },
+ "concurrent": {
+  "pay_tx": "DigPVhdatwdoCkNEwVaw8AW3owrcPd7fsocbRCUL2XQM",
+  "nonce_tx": "5XnwXzB8jdnePFQDwKMJ2pE7DispYooUerMusW1d99Go",
+  "statuses": [
+   200,
+   402
+  ]
+ },
+ "checks": [
+  {
+   "name": "no payment proof",
+   "status": 402,
+   "merchant_error": "PAYMENT-SIGNATURE header is required",
+   "expected": "PAYMENT-SIGNATURE header is required",
+   "passed": true
+  },
+  {
+   "name": "reuse the paid proof",
+   "status": 402,
+   "merchant_error": "invoice already served",
+   "expected": "invoice already served",
+   "passed": true
+  },
+  {
+   "name": "paid transaction claimed for a new invoice",
+   "status": 402,
+   "merchant_error": "no USDC transfer to this merchant for this invoice",
+   "expected": "no USDC transfer to this merchant for this invoice",
+   "passed": true
+  },
+  {
+   "name": "refused payment transaction",
+   "status": 402,
+   "merchant_error": "wallet did not pay: refused: decision not signed by an attested model key for this request",
+   "expected": "wallet did not pay",
+   "passed": true
+  },
+  {
+   "name": "transaction that is not a payment",
+   "status": 402,
+   "merchant_error": "transaction is not a pay call on the payer's wallet",
+   "expected": "transaction is not a pay call",
+   "passed": true
+  },
+  {
+   "name": "same fresh proof sent twice at once",
+   "status": 402,
+   "merchant_error": "invoice payment is already being verified",
+   "expected": "exactly one 200",
+   "passed": true
+  }
+ ]
+}
