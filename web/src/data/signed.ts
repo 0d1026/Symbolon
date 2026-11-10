@@ -29,7 +29,7 @@ export const CASES: LabCase[] = [
   {
     "id": "honest",
     "title": "Honest purchase",
-    "blurb": "A 2 USDC market data invoice. The model approved it. Everything fits.",
+    "blurb": "A 2 USDC invoice the model approved.",
     "invoice": "inv1|id=00000000000000a1|payee=merchant.test.near|amount=2000000|token=usdc|exp=1797929260|memo=market data feed",
     "invoiceSig": "ace2f5424cb07cef9d6880b47cacdaf09179347c777d7f6e8465bfa0a80f9aadef9a2e27e3360698cb4793ae12ef6be27dcf069df7df01c50ca86e09b280270e",
     "nonce": "3814c070aec93c74a8afa5c13655c195b16464da9889baaef0c96a756fe7c8ae",
@@ -41,7 +41,7 @@ export const CASES: LabCase[] = [
   {
     "id": "refused",
     "title": "The model says no",
-    "blurb": "A 3 USDC gift card invoice, which the owner's mandate forbids. The model answered approve: false.",
+    "blurb": "A 3 USDC gift card invoice the owner forbids. The model said no.",
     "invoice": "inv1|id=00000000000000b2|payee=merchant.test.near|amount=3000000|token=usdc|exp=1797929260|memo=gift cards",
     "invoiceSig": "bab9e45c45bdc6b964920fdd41dbde8df0a86da4be1bb3de302167b4f5cb11f90a7f27c2c1107e316b68fdb7cfa8f63318d2da3f33d3677d3467f10e7294950a",
     "nonce": "33228462311c7ab2e0bd66cfe1252f57943c087434aae4cc3f53134bea699267",
@@ -53,7 +53,7 @@ export const CASES: LabCase[] = [
   {
     "id": "forged",
     "title": "The attacker's own approval",
-    "blurb": "The attacker sent their own prompt for the same gift card invoice and got approve: true, signed by the real key.",
+    "blurb": "The attacker's own prompt got a real approval for the same invoice.",
     "invoice": "inv1|id=00000000000000b2|payee=merchant.test.near|amount=3000000|token=usdc|exp=1797929260|memo=gift cards",
     "invoiceSig": "bab9e45c45bdc6b964920fdd41dbde8df0a86da4be1bb3de302167b4f5cb11f90a7f27c2c1107e316b68fdb7cfa8f63318d2da3f33d3677d3467f10e7294950a",
     "nonce": "33228462311c7ab2e0bd66cfe1252f57943c087434aae4cc3f53134bea699267",

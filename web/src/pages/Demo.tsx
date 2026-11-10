@@ -13,14 +13,14 @@ const LANES = [
 const X = Object.fromEntries(LANES.map((l) => [l.k, l.x]));
 
 const STEPS: { from: string; to: string; label: string; log: string[] }[] = [
-  { from: "agent", to: "merchant", label: "GET /data/market-feed", log: ["agent  → GET /data/market-feed"] },
-  { from: "merchant", to: "agent", label: "402 + signed invoice", log: ["merchant ← 402 PAYMENT-REQUIRED", "  x402 v2, one option: an invoice signed with the merchant's ed25519 key"] },
-  { from: "agent", to: "wallet", label: "request_nonce", log: ["agent → v2.symbolon.testnet.request_nonce(invoice_hash)", "  signed by the function-call key; the nonce is single use"] },
-  { from: "agent", to: "model", label: "policy request + nonce + invoice", log: ["agent → NEAR AI: owner's template, nonce, invoice", "  non-streaming, temperature 0, JSON schema output"] },
-  { from: "model", to: "agent", label: "decision, signed in the TEE", log: ["model ← {\"approve\":true, payee, amount, invoice_id}", "  provider_tee signature over sha256(request) and sha256(response)", "  agent checks the hashes against its own bytes before spending gas"] },
-  { from: "agent", to: "wallet", label: "pay(invoice, response, signature)", log: ["agent → wallet.pay(…)", "  wallet: merchant signature ✓  rebuilt request ✓  attested signer ✓", "  approve:true for this invoice ✓  caps ✓  → ft_transfer 2 USDC"] },
-  { from: "agent", to: "merchant", label: "retry + PAYMENT-SIGNATURE", log: ["agent → GET /data/market-feed", "  PAYMENT-SIGNATURE: the transaction hash"] },
-  { from: "merchant", to: "agent", label: "200 + data", log: ["merchant reads the tx from RPC: pay returned “paid”,", "  USDC ft_transfer wallet → merchant, memo “symbolon invoice <id>”", "merchant ← 200 + PAYMENT-RESPONSE", "  invoice id recorded as served"] },
+  { from: "agent", to: "merchant", label: "GET /data/market-feed", log: ["agent → GET /data/market-feed"] },
+  { from: "merchant", to: "agent", label: "402 + signed invoice", log: ["merchant ← 402, signed invoice"] },
+  { from: "agent", to: "wallet", label: "request_nonce", log: ["agent → wallet.request_nonce"] },
+  { from: "agent", to: "model", label: "policy request + nonce + invoice", log: ["agent → NEAR AI: template, nonce, invoice"] },
+  { from: "model", to: "agent", label: "decision, signed in the TEE", log: ["model ← approve: true, provider_tee signature"] },
+  { from: "agent", to: "wallet", label: "pay(invoice, response, signature)", log: ["agent → wallet.pay", "  every check passes → ft_transfer 2 USDC"] },
+  { from: "agent", to: "merchant", label: "retry + PAYMENT-SIGNATURE", log: ["agent → GET, with the transaction hash"] },
+  { from: "merchant", to: "agent", label: "200 + data", log: ["merchant ← verified on chain, 200 + data"] },
 ];
 
 export default function Demo() {
@@ -61,7 +61,7 @@ export default function Demo() {
       <header className="phead">
         <span className="eyebrow mono">Live in your browser</span>
         <Reveal as="h1" text="Run it,|*then break it.*" wait />
-        <p className="lede">Take a real signed decision from NEAR AI, change one character, and watch the wallet's checks catch it. Or replay a recorded HTTP 402 purchase.</p>
+        <p className="lede">Change one character of a real signed decision. Watch the checks catch it.</p>
         <div className="seg demo-tabs" role="tablist" aria-label="Demo mode">
           <button role="tab" aria-selected={tab === "lab"} className={tab === "lab" ? "on" : ""} onClick={() => setTab("lab")}>Break it yourself</button>
           <button role="tab" aria-selected={tab === "replay"} className={tab === "replay" ? "on" : ""} onClick={() => setTab("replay")}>Recorded purchase</button>
@@ -117,10 +117,10 @@ export default function Demo() {
           {i >= STEPS.length - 1 && (
             <div className="done">
               <b>Purchase settled.</b>
-              <p>Real transaction of this flow on testnet: <Tx id="2kj5MfBXPovzF39nCWQqxRNJ7ESc7QPxGSG2rWNmhox5" /></p>
+              <p>Real transaction: <Tx id="2kj5MfBXPovzF39nCWQqxRNJ7ESc7QPxGSG2rWNmhox5" /></p>
             </div>
           )}
-          <p className="dim small">Step {Math.max(i + 1, 0)} of {STEPS.length}. This is a walkthrough of the recorded flow, not a live run. {i >= 0 ? `Now: ${step.label}.` : ""}</p>
+          <p className="dim small">Step {Math.max(i + 1, 0)} of {STEPS.length}</p>
         </aside>
       </section>
       )}

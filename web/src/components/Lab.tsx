@@ -101,9 +101,9 @@ export default function Lab() {
 
     add("req", "Rebuild the request from the owner's template", true,
       <>
-        <span className="lab-k">Hash of the request the model saw</span>
+        <span className="lab-k">Signed by the model</span>
         <span className="mono lab-h">{r.seen}</span>
-        <span className="lab-k">Hash of the request the wallet rebuilt</span>
+        <span className="lab-k">Rebuilt by the wallet</span>
         <span className="mono lab-h"><HashDiff a={r.rq} b={r.seen} /></span>
       </>, "");
 
@@ -111,7 +111,6 @@ export default function Lab() {
 
     add("rec", "Recover who signed it", r.signer ? true : false,
       <>
-        <span className="lab-k">Signed text is model : request hash : response hash</span>
         <span className="mono lab-h">{r.signer ?? r.signerErr}</span>
         {r.signer && <span className={r.signer === MODEL_KEY ? "lab-tag good" : "lab-tag bad"}>{r.signer === MODEL_KEY ? "the attested NEAR AI key" : "not the attested key"}</span>}
       </>, "refused: " + (r.signerErr || "signature does not recover"));
@@ -167,23 +166,23 @@ export default function Lab() {
         <div className="lab-l">
           <div className="lab-tools">
             <span className="mono lab-k">Tamper with it</span>
-            <button className="btn btn-sm btn-ghost" onClick={tamper.amount}><span>Change the amount to 9 USDC</span></button>
+            <button className="btn btn-sm btn-ghost" onClick={tamper.amount}><span>Amount to 9 USDC</span></button>
             <button className="btn btn-sm btn-ghost" onClick={tamper.approve}><span>Flip approve</span></button>
-            <button className="btn btn-sm btn-ghost" onClick={tamper.nonce}><span>Change 1 character of the nonce</span></button>
-            <button className="btn btn-sm btn-ghost" onClick={tamper.sig}><span>Change 1 character of the signature</span></button>
+            <button className="btn btn-sm btn-ghost" onClick={tamper.nonce}><span>Edit the nonce</span></button>
+            <button className="btn btn-sm btn-ghost" onClick={tamper.sig}><span>Edit the signature</span></button>
             <button className="btn btn-sm" onClick={() => setF(fromCase(c))} disabled={!modified}><span>Reset</span></button>
           </div>
 
-          <label className="lab-field"><span className="mono">Invoice, signed by the merchant</span>
+          <label className="lab-field"><span className="mono">Invoice</span>
             <input value={f.invoice} onChange={(e) => setF({ ...f, invoice: e.target.value })} spellCheck={false} />
           </label>
-          <label className="lab-field"><span className="mono">Single-use nonce, issued by the wallet</span>
+          <label className="lab-field"><span className="mono">Nonce</span>
             <input value={f.nonce} onChange={(e) => setF({ ...f, nonce: e.target.value })} spellCheck={false} />
           </label>
-          <label className="lab-field"><span className="mono">Response from the NEAR AI model (exact bytes)</span>
+          <label className="lab-field"><span className="mono">Model response</span>
             <textarea value={f.response} onChange={(e) => setF({ ...f, response: e.target.value })} rows={9} spellCheck={false} />
           </label>
-          <label className="lab-field"><span className="mono">provider_tee signature</span>
+          <label className="lab-field"><span className="mono">Signature</span>
             <input value={f.signature} onChange={(e) => setF({ ...f, signature: e.target.value })} spellCheck={false} />
           </label>
         </div>
@@ -203,7 +202,7 @@ export default function Lab() {
                 <span className="ls-n mono" aria-hidden="true">{s.status === "pass" ? "✓" : s.status === "fail" ? "✕" : s.status === "wait" ? "…" : String(i + 1)}</span>
                 <div>
                   <h4>{s.title}</h4>
-                  {s.status !== "skip" && s.detail && <div className="ls-d">{s.detail}</div>}
+                  {s.status !== "skip" && s.detail && (s.status === "fail" || s.key === "req" || s.key === "rec") && <div className="ls-d">{s.detail}</div>}
                   {s.status === "skip" && <div className="ls-d dim small">Not reached. The contract stops at the first failure.</div>}
                 </div>
               </li>
@@ -212,9 +211,10 @@ export default function Lab() {
         </div>
       </div>
 
-      <p className="dim small lab-note">
-        <b>What is real here.</b> The signatures are genuine NEAR AI provider_tee signatures captured on {CAPTURED_AT}. The hashing, signer recovery and decision checks run in your browser with the same rules as the contract, and whether the signer is an attested key and the spending caps are read live from testnet. <b>What is not.</b> This does not send a transaction. The recorded cases come from the contract's sandbox tests (merchant <code>merchant.test.near</code>), so the merchant allowlist, single-use nonces and settled invoices, which are on-chain state, are not simulated here. The <TLink to="/attacks" className="tx">attacks page</TLink> shows those on testnet.
-      </p>
+      <details className="lab-note">
+        <summary className="mono">What is real here?</summary>
+        <p className="dim small">Real NEAR AI signatures, captured 2026-11-07. Hashing and signer recovery run in your browser. The attested-key check and the caps are read live from testnet. No transaction is sent, so the allowlist and nonce state are not simulated. The <TLink to="/attacks" className="tx">attacks page</TLink> shows those on testnet.</p>
+      </details>
     </div>
   );
 }

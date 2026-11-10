@@ -105,7 +105,7 @@ export default function Wallet() {
           <Ruler caps={caps} />
           <div className="stats">
             <Rise><div className="stat"><small className="mono">Approval threshold</small><b><CountUp to={num(caps.approval_threshold)} /> <i>USDC</i></b><p>Above this, the owner decides.</p></div></Rise>
-            <Rise delay={0.07}><div className="stat"><small className="mono">Per payment</small><b><CountUp to={num(caps.per_payment)} /> <i>USDC</i></b><p>No single payment may exceed it.</p></div></Rise>
+            <Rise delay={0.07}><div className="stat"><small className="mono">Per payment</small><b><CountUp to={num(caps.per_payment)} /> <i>USDC</i></b><p>Per payment limit.</p></div></Rise>
             <Rise delay={0.14}><div className="stat"><small className="mono">Per UTC day</small><b><CountUp to={perDay} /> <i>USDC</i></b><p>{d ? `${usdc(d.spend.spent)} spent, ${usdc(d.spend.pending)} pending today` : "Daily total across all merchants."}</p></div></Rise>
           </div>
           {d && perDay > 0 && (
@@ -127,7 +127,7 @@ export default function Wallet() {
               <li><span>Access keys on the wallet</span><b className={d ? (d.fullAccessKeys ? "warnc" : "good") : ""}>{d ? `${d.functionCallKeys} limited, ${d.fullAccessKeys} full access` : "…"}</b></li>
               <li><span>Agent key</span><b className="mono wrap">{d ? (d.agentKey ?? "none") : snap ? SNAPSHOT.agent_key : "…"}</b></li>
             </ul>
-            <p className="note">The agent key can call <code>request_nonce</code> and <code>pay</code>. Nothing else. On testnet the wallet still has its deployment full-access key, used for the in-place upgrade. A production wallet deletes it.</p>
+            <p className="note">The agent key can only call <code>request_nonce</code> and <code>pay</code>. The full-access key is the testnet deployment key.</p>
           </div>
         </Rise>
         <Rise delay={0.08}>
@@ -139,15 +139,13 @@ export default function Wallet() {
               <li><span>Merchant cap</span><b>{d?.merchant ? `${usdc(d.merchant.cap)} USDC` : snap ? `${usdc(SNAPSHOT.merchant_cap)} USDC` : "…"}</b></li>
               <li><span>Held payments (ids 0, 1)</span><b>{d ? (Object.values(d.held).filter(Boolean).length ? "Waiting for owner" : "None waiting") : "…"}</b></li>
             </ul>
-            <p className="note">Held payments with no waiting entry were approved or rejected by the owner.</p>
-          </div>
+                      </div>
         </Rise>
       </section>
 
       <section className="sec">
         <span className="eyebrow mono">Look up an invoice</span>
         <h2 className="h2s">Was it <em>settled?</em></h2>
-        <p className="lede">The contract exposes <code>is_settled</code> but no payment list, so this checks one invoice at a time.</p>
         <SettledLookup />
       </section>
     </main>

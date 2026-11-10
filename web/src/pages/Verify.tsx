@@ -12,7 +12,7 @@ export default function Verify() {
       <header className="phead">
         <span className="eyebrow mono">No keys or accounts needed</span>
         <Reveal as="h1" text="Don't trust us.|*Check.*" wait />
-        <p className="lede">Three checks, from slowest and strongest to fastest. The last two run right here against the public testnet node.</p>
+        <p className="lede">Three checks. The last two run right here.</p>
       </header>
 
       <ol className="vsteps">
@@ -20,16 +20,16 @@ export default function Verify() {
           <Rise>
             <div className="vn mono">01</div>
             <h3>Build it and run the tests</h3>
-            <p>Needs <code>rustup</code> (Rust 1.95.0 installs from <code>rust-toolchain.toml</code>), <code>curl</code>, <code>python3</code> and network access. About 3 minutes with warm caches. The tests run NEAR One's verifier at the exact code deployed on mainnet against real NEAR AI quotes and signed decisions captured on 2026-11-07.</p>
+            <p>About 3 minutes. Needs <code>rustup</code>, <code>curl</code> and <code>python3</code>.</p>
             <CopyBlock label="terminal" code={`git clone ${REPO}.git\ncd Symbolon\ncargo install cargo-near@0.23.0 --locked\n./scripts/build.sh\ncd contract\nRUST_TEST_THREADS=3 cargo test`} />
-            <p className="expect mono">Expect: 56 tests pass (6 unit, 25 registry, 1 migration, 4 mock verifier, 11 payment, 9 payment ownership).</p>
+            <p className="expect mono">Expect: 56 tests pass.</p>
           </Rise>
         </li>
         <li>
           <Rise>
             <div className="vn mono">02</div>
             <h3>Is the model's key registered on chain?</h3>
-            <p>The wallet only accepts decisions signed by a key that went through the Intel verifier. Ask it.</p>
+            <p>The wallet only trusts keys that passed the Intel verifier.</p>
             <LiveCheck
               label="is_key_valid"
               cmd={`${WALLET}.is_key_valid({ address: "${MODEL_KEY}", profile: "${PROFILE}" })`}
@@ -43,7 +43,7 @@ export default function Verify() {
           <Rise>
             <div className="vn mono">03</div>
             <h3>Is the verifier the mainnet code, and locked?</h3>
-            <p>On mainnet NEAR One's verifier is <code>tee-verifier-2026-08-04.near</code>. Testnet has no copy under that name, so we deployed identical code and deleted its only key. Two public facts prove it.</p>
+            <p>Testnet runs an identical copy of the mainnet verifier, with its only key deleted.</p>
             <LiveCheck
               label="view_account · code hash"
               cmd={`view_account ${VERIFIER}`}
@@ -56,7 +56,7 @@ export default function Verify() {
               expect="keys: 0"
               run={async () => { const k = await viewKeys(VERIFIER); return `keys: ${k.keys.length}`; }}
             />
-            <p className="expect mono">Expect: code hash {VERIFIER_HASH} and an empty key list.</p>
+            <p className="expect mono">Expect: this code hash and no keys.</p>
           </Rise>
         </li>
       </ol>

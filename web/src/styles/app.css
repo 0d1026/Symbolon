@@ -134,7 +134,7 @@ main, .page { min-height: 100vh; }
 .phead h1 { margin: 18px 0 0; font-size: clamp(3.2rem, 8.4vw, 8rem); }
 .back { color: var(--dim); display: inline-block; margin-bottom: 36px; transition: color 0.3s, transform 0.4s var(--ease); }
 .back:hover { color: var(--verd); transform: translateX(-4px); }
-.sec { padding: clamp(80px, 12vw, 180px) var(--pad); position: relative; }
+.sec { padding: clamp(64px, 8vw, 120px) var(--pad); position: relative; }
 .page .sec { padding: 72px 0 0; }
 .shead h2 { margin-top: 16px; max-width: 14ch; }
 .shead .lede { margin-top: 24px; }
@@ -188,7 +188,7 @@ main, .page { min-height: 100vh; }
 /* ───────────── Conditions ───────────── */
 .conds .shead { margin-bottom: 64px; }
 .cond-stack { position: relative; }
-.cond { position: sticky; display: grid; grid-template-columns: auto 1fr; gap: clamp(20px, 5vw, 80px); align-items: end; min-height: 46vh; margin-bottom: 4vh; padding: clamp(28px, 4vw, 56px); background: var(--ink-2); border: 1px solid var(--line-2); border-radius: 6px; transform-origin: 50% 0; box-shadow: 0 -30px 60px rgba(0, 0, 0, 0.5); }
+.cond { position: sticky; display: grid; grid-template-columns: auto 1fr; gap: clamp(20px, 5vw, 80px); align-items: end; min-height: 34vh; margin-bottom: 4vh; padding: clamp(28px, 4vw, 56px); background: var(--ink-2); border: 1px solid var(--line-2); border-radius: 6px; transform-origin: 50% 0; box-shadow: 0 -30px 60px rgba(0, 0, 0, 0.5); }
 .cond:nth-child(even) { background: var(--ink-3); }
 .cond-n { font-family: var(--serif); font-size: clamp(6rem, 16vw, 15rem); line-height: 0.8; color: transparent; -webkit-text-stroke: 1px var(--bone-2); }
 .cond-b h3 { max-width: 20ch; }
@@ -484,3 +484,10 @@ main, .page { min-height: 100vh; }
 }
 .lab-head .seg { margin: 0; }
 .lab { margin-top: -24px; }
+
+.fold summary, .lab-note summary { cursor: pointer; color: var(--dim); list-style: none; text-transform: uppercase; letter-spacing: 0.1em; padding: 6px 0; }
+.fold summary::before, .lab-note summary::before { content: "+ "; color: var(--verd); }
+.fold[open] summary::before, .lab-note[open] summary::before { content: "− "; }
+.fold summary:hover, .lab-note summary:hover { color: var(--verd); }
+.lab-note { margin-top: 40px; }
+.lab-note p { margin-top: 10px; }

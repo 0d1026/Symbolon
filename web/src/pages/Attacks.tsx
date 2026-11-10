@@ -7,12 +7,12 @@ import { TLink } from "../components/TLink";
 import { Token } from "../components/Token";
 
 const LIMITS = [
-  ["Shared model key", "One key serves every instance of a model. Registration proves the key lives in at least one enclave with allowlisted measurements, not that every instance holding it does."],
-  ["Fooled agent", "An agent fooled into requesting a valid invoice from an allowlisted merchant for an allowed item can spend up to the caps."],
-  ["Policy model", "A compromised agent can ask the model several times off chain with one nonce and submit only an approving answer. Each payment is still bounded by the allowlist and the caps."],
-  ["Not checked on chain", "NVIDIA GPU evidence and RTMR3 event log replay. The configuration is bound through mr_config_id."],
-  ["Decisions are public", "The approval and its hashes are on chain. Symbolon offers selective disclosure, not privacy."],
-  ["Daily cap", "The window is the UTC day, so up to twice per_day can be spent across midnight."],
+  ["Shared model key", "One key serves every instance of a model."],
+  ["Fooled agent", "A fooled agent can still spend up to the caps."],
+  ["Retries", "A compromised agent can ask the model many times and submit the best answer."],
+  ["Not checked on chain", "GPU evidence and the RTMR3 event log."],
+  ["Decisions are public", "Selective disclosure, not privacy."],
+  ["Daily cap", "Resets at UTC midnight, so up to twice the cap can move across it."],
 ];
 
 export default function Attacks() {
@@ -21,17 +21,16 @@ export default function Attacks() {
       <header className="phead">
         <span className="eyebrow mono">Threat model · testnet · 2026-11-07</span>
         <Reveal as="h1" text="Six attacks,|*zero* for the attacker." wait />
-        <p className="lede">Each one ran against <code>v2.symbolon.testnet</code>. Raw records, with request hashes and model answers, are in the repository.</p>
+        <p className="lede">Run on testnet. Every transaction is linked.</p>
       </header>
       <AttackRows full />
       <section className="sec balances">
-        <span className="eyebrow mono">Balances in USDC, before and after the 2026-11-07 attack run (recorded snapshot)</span>
+        <span className="eyebrow mono">USDC before and after, recorded 2026-11-07</span>
         <div className="bal">
           <div><small className="mono">symbolon-attacker.testnet</small><b><CountUp to={0} /> <i>→</i> <CountUp to={0} /></b><span>no change</span></div>
-          <div><small className="mono">symbolon-merchant.testnet</small><b>4 <i>→</i> 56</b><span>+52: the honest 2 USDC and the owner-approved 50</span></div>
-          <div><small className="mono">v2.symbolon.testnet</small><b>996 <i>→</i> 944</b><span>−52, to the merchant only</span></div>
+          <div><small className="mono">symbolon-merchant.testnet</small><b>4 <i>→</i> 56</b><span>+52, both approved</span></div>
+          <div><small className="mono">v2.symbolon.testnet</small><b>996 <i>→</i> 944</b><span>−52, to the merchant</span></div>
         </div>
-        <p className="dim small snapnote">These are the numbers recorded at the time. The wallet page shows today's balance, which has moved since because more payments ran after that date.</p>
       </section>
       <section className="sec limits">
         <span className="eyebrow mono">What these tests don't cover</span>
@@ -41,7 +40,6 @@ export default function Attacks() {
             <Rise key={k}><div><dt>{k}</dt><dd>{v}</dd></div></Rise>
           ))}
         </dl>
-        <p className="dim small">Full list in the repository README under “Limits and trust assumptions”.</p>
       </section>
     </main>
   );

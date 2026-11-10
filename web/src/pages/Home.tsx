@@ -67,7 +67,7 @@ function Hero() {
         <Token intro state="match" className="float" />
       </div>
       <p className="hero-sub hero-fade">
-        Symbolon is a NEAR wallet for AI agents. It releases USDC only when the owner's rules pass, an attested AI model approved <em>this exact</em> invoice, and the chain has checked the model's key against Intel hardware.
+        A NEAR wallet for AI agents. It pays only when an attested AI model approved <em>this exact</em> invoice.
       </p>
       <div className="hero-cta hero-fade">
         <TLink to="/attacks" className="btn"><span>See six attacks fail</span><i>→</i></TLink>
@@ -86,8 +86,8 @@ function Definition() {
         <Rise>
           <div className="dict">
             <div className="dict-word">σύμβολον</div>
-            <div className="mono dict-pron">sým·bo·lon · noun · Greek</div>
-            <p>A token broken in two. Each party keeps a half. Later, the halves are fitted together; only the true pair matches along the break.</p>
+            <div className="mono dict-pron">sým·bo·lon · Greek</div>
+            <p>A token broken in two. Only the true pair fits.</p>
           </div>
         </Rise>
       </div>
@@ -95,7 +95,7 @@ function Definition() {
         <span className="eyebrow mono">§ 01 · The problem</span>
         <ScrubText
           className="define-text"
-          text="NEAR AI signs every response, but every customer of a model gets signatures from the same key. So a signature alone authorizes nothing: anyone can obtain a genuine approval by sending their own prompt. Symbolon keeps one half itself. The wallet rebuilds the exact request from the owner's template, a single-use nonce and the invoice, and accepts only a signature that fits."
+          text="Anyone can get a genuine NEAR AI approval by sending their own prompt. So a signature alone proves nothing. Symbolon rebuilds the exact request itself and accepts only a signature that fits."
         />
       </div>
     </section>
@@ -104,10 +104,10 @@ function Definition() {
 
 /* ───────────────────────── Four conditions ───────────────────────── */
 const CONDITIONS = [
-  { n: "01", t: "The invoice is the merchant's", d: "The merchant signed the invoice, and the merchant is on the owner's allowlist.", by: "env::ed25519_verify" },
-  { n: "02", t: "The model approved this invoice", d: "A NEAR AI model approved that exact invoice. The contract rebuilds the request from the owner's template, a single-use nonce and the invoice, so an approval for any other request is refused.", by: "sha256 · ecrecover" },
-  { n: "03", t: "The key lives in real hardware", d: "The model's signing key was registered on chain through NEAR One's Intel TDX verifier, with a fresh nonce and measurements the owner allowlisted.", by: "verify_quote → on_attestation_verified" },
-  { n: "04", t: "The amount fits the limits", d: "The amount fits the merchant cap, the per-payment cap and the daily cap. Above the approval threshold, the payment waits for the owner.", by: "caps · approve_held" },
+  { n: "01", t: "A trusted merchant", d: "The merchant signed the invoice and is on the allowlist." },
+  { n: "02", t: "This exact invoice", d: "The model approved this request, not any other." },
+  { n: "03", t: "Real hardware", d: "The model's key was verified on chain against Intel TDX." },
+  { n: "04", t: "Within the limits", d: "Caps hold. Large payments wait for the owner." },
 ];
 
 function Conditions() {
@@ -137,7 +137,6 @@ function Conditions() {
             <div className="cond-b">
               <h3>{c.t}</h3>
               <p>{c.d}</p>
-              <div className="mono cond-by"><span>checked by</span> {c.by}</div>
             </div>
           </article>
         ))}
@@ -169,7 +168,7 @@ function Match() {
     <section className="sec match">
       <div className="match-l">
         <SectionHead index="03 · The match" title={<>Try to <em>fool</em> it.</>}>
-          Pick whose request the model signed. The wallet compares that hash with the one it rebuilt for itself. These are the real hashes from the forged-approval attack on testnet.
+          Pick whose request the model signed. Real hashes from a testnet attack.
         </SectionHead>
         <div className="seg" role="tablist" aria-label="Whose request was signed">
           <button role="tab" aria-selected={ok} className={ok ? "on" : ""} onClick={() => setWho("owner")}>The owner's request</button>
@@ -177,20 +176,19 @@ function Match() {
         </div>
         <dl className="hashes">
           <div>
-            <dt className="mono">Hash the model signed</dt>
+            <dt className="mono">Signed by the model</dt>
             <dd className="mono"><Scramble text={signed} className="hash-s" key={who} /></dd>
           </div>
           <div>
-            <dt className="mono">Hash the wallet rebuilt</dt>
+            <dt className="mono">Rebuilt by the wallet</dt>
             <dd className="mono"><HashLine signed={OWNER_HASH} rebuilt={signed} /></dd>
           </div>
         </dl>
         <div className={`verdict ${ok ? "good" : "bad"}`} aria-live="polite">
           <b className="mono">{ok ? "ACCEPTED" : "REFUSED"}</b>
-          <span>{ok ? "The halves fit. The wallet goes on to check the caps." : "refused: decision not signed by an attested model key for this request"}</span>
+          <span>{ok ? "The halves fit." : "The hashes differ."}</span>
           {!ok && <Tx id="4K3FyWkTVmePfbVo7NLgAN7HCDCYXr6xTk9LchThjYNB" />}
         </div>
-        <p className="dim small simnote">Interactive illustration. Both hashes are real, from the recorded forged-approval attack on testnet. The refusal is a real transaction. The "owner's request" case shows what a fitting signature looks like; it is not a recorded payment.</p>
       </div>
       <div className="match-r">
         <Token state={state} />
@@ -210,10 +208,10 @@ const NODES: Record<string, { x: number; y: number; t: string; s: string }> = {
 };
 type Edge = [string, string];
 const STEPS: { t: string; d: string; edges: Edge[] }[] = [
-  { t: "Register the model key", d: "Anyone asks the wallet for a nonce, fetches a NEAR AI attestation report for it and submits the Intel quote. The wallet sends the quote to NEAR One's verifier, then checks the report binds the key and the nonce, and that its measurements are on the owner's allowlist.", edges: [["model", "wallet"], ["wallet", "verifier"]] },
-  { t: "Get an invoice", d: "The agent requests a paid resource and receives HTTP 402 with an invoice signed by the merchant.", edges: [["merchant", "agent"]] },
-  { t: "Ask the model", d: "The agent gets a nonce for that invoice from the wallet, then sends the owner's policy request, with the nonce and invoice in it, to NEAR AI. The decision comes back signed inside the model's TEE.", edges: [["agent", "wallet"], ["agent", "model"], ["model", "agent"]] },
-  { t: "Pay", d: "The agent calls pay. The wallet checks the merchant's signature, rebuilds the request, recovers the signer, requires an attested key and approve: true for this invoice, applies the caps, then transfers USDC or holds the payment for the owner.", edges: [["agent", "wallet"], ["wallet", "usdc"], ["usdc", "merchant"]] },
+  { t: "Register the model key", d: "The wallet verifies the model's Intel quote on chain.", edges: [["model", "wallet"], ["wallet", "verifier"]] },
+  { t: "Get an invoice", d: "The merchant answers HTTP 402 with a signed invoice.", edges: [["merchant", "agent"]] },
+  { t: "Ask the model", d: "The agent sends the invoice to NEAR AI and gets a signed decision.", edges: [["agent", "wallet"], ["agent", "model"], ["model", "agent"]] },
+  { t: "Pay", d: "The wallet checks everything, then sends USDC or holds it for the owner.", edges: [["agent", "wallet"], ["wallet", "usdc"], ["usdc", "merchant"]] },
 ];
 
 function Flow() {
@@ -296,8 +294,8 @@ export function AttackRows({ full = false }: { full?: boolean }) {
           <TLink to={`/attacks/${a.slug}`} className="arow">
             <span className="mono an">{a.n}</span>
             <span className="aname">{a.name}</span>
-            <span className="astop">{full && <small className="mono">What the attacker did</small>}{full ? a.did : a.stopped}</span>
-            <span className="amoved mono"><small>USDC to attacker</small>0</span>
+            <span className="astop">{full ? a.did : a.stopped}</span>
+            <span className="amoved mono"><small>attacker gets</small>0</span>
             <span className="aarrow" aria-hidden="true">↗</span>
           </TLink>
         </li>
@@ -309,9 +307,7 @@ export function AttackRows({ full = false }: { full?: boolean }) {
 function Attacks() {
   return (
     <section className="sec attacks">
-      <SectionHead index="05 · The proof" title={<>Six live attacks. The attacker's balance stayed <em>at zero.</em></>}>
-        Run against the deployed wallet on NEAR testnet on 2026-11-07. Every row links to its transactions.
-      </SectionHead>
+      <SectionHead index="05 · The proof" title={<>Six live attacks. The attacker got <em>zero.</em></>} />
       <AttackRows />
       <Rise className="center"><TLink to="/attacks" className="btn btn-ghost"><span>All attacks and limits</span><i>→</i></TLink></Rise>
     </section>
@@ -322,9 +318,7 @@ function Attacks() {
 function VerifyTeaser() {
   return (
     <section className="sec verify-t">
-      <SectionHead index="06 · Don't trust us" title={<>Ask the chain <em>yourself.</em></>}>
-        No account, no keys. This calls a public testnet node straight from your browser.
-      </SectionHead>
+      <SectionHead index="06 · Don't trust us" title={<>Ask the chain <em>yourself.</em></>} />
       <Rise>
         <LiveCheck
           label="is_key_valid · is the model's key registered?"
@@ -338,10 +332,7 @@ function VerifyTeaser() {
   );
 }
 
-const TICKER = [
-  "6 live attacks refused", "attacker balance 0 → 0 USDC", "56 contract tests", "Intel TDX quote verified on chain",
-  "NEAR AI provider_tee signatures", "HTTP 402 · x402", "agent key: request_nonce + pay only", "owner approves anything large",
-];
+const TICKER = ["6 live attacks", "attacker balance 0 USDC", "Intel TDX verified on chain", "NEAR AI signatures", "HTTP 402", "owner approves anything large"];
 
 export default function Home() {
   return (

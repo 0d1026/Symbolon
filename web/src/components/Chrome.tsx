@@ -80,7 +80,7 @@ export function Footer() {
   return (
     <footer className="foot">
       <div className="foot-top">
-        <p className="foot-claim">An AI agent can spend from this wallet only within the owner's limits, only when an AI model approved the payment, and only after the chain checked the model's key against genuine Intel hardware.</p>
+        <p className="foot-claim">Two halves must fit before an agent pays.</p>
         <div className="foot-cols mono">
           <div>
             <h4>Pages</h4>
@@ -98,7 +98,7 @@ export function Footer() {
         {"Symbolon".split("").map((c, i) => <span key={i}>{c}</span>)}
       </div>
       <div className="foot-base mono">
-        <span>Built during NEAR HACKATHON · AI Security &amp; Defense, Agent Economy</span>
+        <span>Built during NEAR HACKATHON</span>
         <span>Testnet only · Apache 2.0</span>
       </div>
     </footer>
