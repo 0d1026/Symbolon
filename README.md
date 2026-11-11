@@ -11,7 +11,7 @@ Symbolon is a NEAR contract wallet for AI agents. It pays a merchant in USDC onl
 
 Tracks: AI Security & Defense, Agent Economy. Network: NEAR testnet.
 
-More detail: [design](docs/design.md) (terms, every check, formats, contract interface, full threat model with tests), [build and deploy](docs/operate.md). Live evidence: [deployments](docs/deployments.md), [attacks](docs/attacks-testnet.md), [HTTP 402 agent and merchant](docs/agent-merchant.md).
+More detail: [design](docs/design.md) (terms, every check, formats, contract interface, full threat model with tests), [build and deploy](docs/operate.md). Live evidence: [deployments](docs/deployments.md), [attacks](docs/attacks-testnet.md), [HTTP 402 agent and merchant](docs/agent-merchant.md). Benchmark: [20 legitimate payments and 20 attacks in the sandbox](docs/benchmark.md); rerun with `./scripts/build.sh && cd contract && cargo test --test benchmark -- --ignored --nocapture`.
 
 ## Problem
 
