@@ -113,6 +113,31 @@ NEAR One's verifier is `tee-verifier-2026-08-04.near` on mainnet and has no test
 
 Full tables: [deployments](docs/deployments.md), [attacks](docs/attacks-testnet.md), [agent and merchant](docs/agent-merchant.md). Open a transaction at `https://testnet.nearblocks.io/txns/<id>`.
 
+## Benchmark
+
+Run 20 legitimate payments and 20 attacks, each in a fresh sandbox, against the real verifier code, the attested key and the NEAR AI decisions captured on 2026-11-07.
+
+```
+./scripts/build.sh
+cd contract
+cargo test --test benchmark -- --ignored --nocapture
+```
+
+See the table below, written to [docs/benchmark.md](docs/benchmark.md) and `docs/benchmark.json`. Set `BENCH_LEGIT=100 BENCH_ATTACKS=100` for a larger run.
+
+| Kind | Runs | Result | Gas on wallet, Tgas | Gas, whole transaction, Tgas |
+| --- | ---: | --- | ---: | ---: |
+| Legitimate payment | 20 | 20 paid | 6.49 | 8.46 |
+| Forged decision | 3 | 3 blocked | 3.22 | 3.53 |
+| Tampered response | 3 | 3 blocked | 3.22 | 3.53 |
+| Replay | 3 | 3 blocked | 1.92 | 2.23 |
+| Stolen agent key on an owner method | 3 | 3 blocked by the protocol | 0 | 0 |
+| Prompt injected payment to attacker | 3 | 3 blocked | 1.57 | 1.88 |
+| Prompt injected purchase outside the mandate | 3 | 3 blocked | 3.47 | 3.78 |
+| Large payment | 2 | 2 held for the owner | 3.79 | 4.10 |
+
+Limits: local sandbox and recorded decisions, with no live NEAR AI call, so the timings in docs/benchmark.md understate real latency. Each attack type ran 2 or 3 times.
+
 ## Threat model
 
 | Attack | Stopped by | Live transaction |
