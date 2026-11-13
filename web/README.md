@@ -1,5 +1,7 @@
 # Symbolon web
 
+Live: https://symbolon-ten.vercel.app
+
 Frontend for Symbolon. Vite + React + TypeScript, GSAP (ScrollTrigger) and Lenis for motion. No backend: pages read the public testnet RPC from the browser.
 
 ```
