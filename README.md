@@ -9,9 +9,13 @@ Symbolon is a NEAR contract wallet for AI agents. It pays a merchant in USDC onl
 3. The model's signing key was registered on chain through NEAR One's Intel TDX verifier, with a fresh nonce and measurements the owner allowlisted.
 4. The amount fits the merchant cap, the per payment cap and the daily cap. Above the approval threshold, the payment waits for the owner.
 
+**Live demo: [symbolon-ten.vercel.app](https://symbolon-ten.vercel.app)**. In the [demo lab](https://symbolon-ten.vercel.app/demo), edit a real signed NEAR AI decision in your browser and watch the wallet's checks refuse it.
+
+**Benchmark:** 20 of 20 legitimate payments paid, 18 of 18 attacks blocked, 0 leaked, about 8.5 Tgas per payment ([details](docs/benchmark.md)).
+
 Tracks: AI Security & Defense, Agent Economy. Network: NEAR testnet.
 
-More detail: [design](docs/design.md) (terms, every check, formats, contract interface, full threat model with tests), [build and deploy](docs/operate.md). Live evidence: [deployments](docs/deployments.md), [attacks](docs/attacks-testnet.md), [HTTP 402 agent and merchant](docs/agent-merchant.md). Benchmark: [20 legitimate payments and 20 attacks in the sandbox](docs/benchmark.md); rerun with `./scripts/build.sh && cd contract && cargo test --test benchmark -- --ignored --nocapture`.
+More detail: [design](docs/design.md) (terms, every check, formats, contract interface, full threat model with tests), [build and deploy](docs/operate.md). Live evidence: [deployments](docs/deployments.md), [attacks](docs/attacks-testnet.md), [HTTP 402 agent and merchant](docs/agent-merchant.md).
 
 ## Problem
 
@@ -123,20 +127,9 @@ cd contract
 cargo test --test benchmark -- --ignored --nocapture
 ```
 
-See the table below, written to [docs/benchmark.md](docs/benchmark.md) and `docs/benchmark.json`. Set `BENCH_LEGIT=100 BENCH_ATTACKS=100` for a larger run.
+See 20 of 20 legitimate payments paid, 18 of 18 attacks blocked across six attack types, 0 leaked, and 2 of 2 large payments held for the owner. A payment burns about 8.5 Tgas. The table per attack type is in [docs/benchmark.md](docs/benchmark.md), raw data in `docs/benchmark.json`. Set `BENCH_LEGIT=100 BENCH_ATTACKS=100` for a larger run.
 
-| Kind | Runs | Result | Gas on wallet, Tgas | Gas, whole transaction, Tgas |
-| --- | ---: | --- | ---: | ---: |
-| Legitimate payment | 20 | 20 paid | 6.49 | 8.46 |
-| Forged decision | 3 | 3 blocked | 3.22 | 3.53 |
-| Tampered response | 3 | 3 blocked | 3.22 | 3.53 |
-| Replay | 3 | 3 blocked | 1.92 | 2.23 |
-| Stolen agent key on an owner method | 3 | 3 blocked by the protocol | 0 | 0 |
-| Prompt injected payment to attacker | 3 | 3 blocked | 1.57 | 1.88 |
-| Prompt injected purchase outside the mandate | 3 | 3 blocked | 3.47 | 3.78 |
-| Large payment | 2 | 2 held for the owner | 3.79 | 4.10 |
-
-Limits: local sandbox and recorded decisions, with no live NEAR AI call, so the timings in docs/benchmark.md understate real latency. Each attack type ran 2 or 3 times.
+Limits: local sandbox and recorded decisions, with no live NEAR AI call, so the timings understate real latency. Each attack type ran 3 times.
 
 ## Threat model
 
@@ -212,6 +205,7 @@ Testnet note: `v2.symbolon.testnet` still has its deployment full access key, us
 | `mock-verifier/` | sandbox only verifier that returns a preset answer |
 | `mock-usdc/` | NEP-141 USDC stand in for sandbox and testnet |
 | `app/` | TypeScript agent, merchant and checks |
+| `web/` | the demo site at [symbolon-ten.vercel.app](https://symbolon-ten.vercel.app); reads testnet RPC from the browser, no backend |
 | `scripts/` | build, capture, registration, live payment and attack scripts |
 | `spec/` | owner policy templates for sandbox and testnet |
 | `docs/design.md` | terms, every check, formats, contract interface, full threat model |
